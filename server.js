@@ -4,45 +4,58 @@ const app = express();
 
 const PORT = process.env.PORT || 10000;
 
-// CORS allow
 app.use((req,res,next)=>{
-  res.header("Access-Control-Allow-Origin","*");
-  res.header("Access-Control-Allow-Headers","Origin, X-Requested-With, Content-Type, Accept");
-  next();
-});
-
-app.get("/", (req,res)=>{
-  res.send("IG Reel API Running");
+res.header("Access-Control-Allow-Origin","*");
+next();
 });
 
 app.get("/views", async (req,res)=>{
-  try{
-    const url = req.query.url;
-    if(!url) return res.status(400).json({error:"Missing url"});
 
-    const browser = await puppeteer.launch({
-      headless:true,
-      args:["--no-sandbox","--disable-setuid-sandbox"]
-    });
+try{
 
-    const page = await browser.newPage();
-    await page.goto(url,{waitUntil:"networkidle2",timeout:0});
+const url = req.query.url;
 
-    const html = await page.content();
-
-    const match = html.match(/view_count[^0-9]*([0-9]+)/i);
-    const views = match ? match[1] : "Not Found";
-
-    await browser.close();
-
-    res.json({
-      views: views,
-      updated: new Date().toLocaleTimeString()
-    });
-
-  }catch(e){
-    res.status(500).json({views:"Error",updated:"Failed"});
-  }
+const browser = await puppeteer.launch({
+headless:true,
+args:["--no-sandbox","--disable-setuid-sandbox"]
 });
 
-app.listen(PORT, ()=>console.log("Running on "+PORT));
+const page = await browser.newPage();
+
+await page.setUserAgent(
+"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36"
+);
+
+await page.goto(url,{waitUntil:"domcontentloaded",timeout:60000});
+
+await page.waitForTimeout(4000);
+
+const html = await page.content();
+
+let match = html.match(/view_count[^0-9]*([0-9]+)/i);
+
+if(!match){
+match = html.match(/video_view_count[^0-9]*([0-9]+)/i);
+}
+
+const views = match ? match[1] : "Not Found";
+
+await browser.close();
+
+res.json({
+views: views,
+updated: new Date().toLocaleTimeString()
+});
+
+}catch(e){
+
+res.json({
+views:"Failed",
+updated:"Try Public Reel"
+});
+
+}
+
+});
+
+app.listen(PORT);
